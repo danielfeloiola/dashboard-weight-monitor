@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Body Composition Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/luxon/3.4.4/luxon.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-adapter-luxon/1.3.1/chartjs-adapter-luxon.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #f8f7f4;
+    --bg-card: #ffffff;
+    --bg-input: #ffffff;
+    --text: #1a1a18;
+    --text-secondary: #6b6a65;
+    --text-tertiary: #9c9b96;
+    --border: rgba(0,0,0,0.08);
+    --border-hover: rgba(0,0,0,0.15);
+    --accent-adipo: #c44d20;
+    --accent-bia: #2a6cb8;
+    --accent-3c: #148060;
+    --accent-4c: #7c3aad;
+    --accent-adipo-bg: rgba(196,77,32,0.08);
+    --accent-bia-bg: rgba(42,108,184,0.08);
+    --accent-3c-bg: rgba(20,128,96,0.08);
+    --accent-4c-bg: rgba(124,58,173,0.08);
+    --danger: #b83030;
+    --danger-bg: rgba(184,48,48,0.08);
+    --warning: #a07010;
+    --warning-bg: rgba(160,112,16,0.08);
+    --shadow: 0 1px 3px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.04);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614;
+      --bg-card: #1e1e1c;
+      --bg-input: #252523;
+      --text: #e8e7e3;
+      --text-secondary: #9c9b96;
+      --text-tertiary: #6b6a65;
+      --border: rgba(255,255,255,0.08);
+      --border-hover: rgba(255,255,255,0.15);
+      --accent-adipo-bg: rgba(196,77,32,0.12);
+      --accent-bia-bg: rgba(42,108,184,0.12);
+      --accent-3c-bg: rgba(20,128,96,0.12);
+      --accent-4c-bg: rgba(124,58,173,0.12);
+      --danger-bg: rgba(184,48,48,0.12);
+      --warning-bg: rgba(160,112,16,0.12);
+      --shadow: 0 1px 3px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.05);
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DM Sans', -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; padding: 2rem; max-width: 1100px; margin: 0 auto; }
+  header { margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 1.5rem; font-weight: 500; letter-spacing: -0.02em; margin-bottom: 0.25rem; }
+  header p { font-size: 0.85rem; color: var(--text-secondary); }
+
+  .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 2rem; }
+  .metric-card { background: var(--bg-card); border-radius: 10px; padding: 1rem 1.15rem; box-shadow: var(--shadow); }
+  .metric-card .label { font-size: 0.75rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .metric-card .value { font-size: 1.65rem; font-weight: 500; letter-spacing: -0.02em; font-family: 'JetBrains Mono', monospace; }
+  .metric-card .sub { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
+  .metric-card .delta { font-size: 0.8rem; font-weight: 500; }
+  .delta.down { color: var(--accent-3c); }
+  .delta.up { color: var(--danger); }
+
+  .method-tag { display: inline-block; font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 500; letter-spacing: 0.02em; }
+  .tag-adipo { background: var(--accent-adipo-bg); color: var(--accent-adipo); }
+  .tag-bia { background: var(--accent-bia-bg); color: var(--accent-bia); }
+  .tag-3c { background: var(--accent-3c-bg); color: var(--accent-3c); }
+  .tag-4c { background: var(--accent-4c-bg); color: var(--accent-4c); }
+
+  .section { background: var(--bg-card); border-radius: 12px; padding: 1.5rem; box-shadow: var(--shadow); margin-bottom: 1.5rem; }
+  .section h2 { font-size: 1rem; font-weight: 500; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .section h3 { font-size: 0.85rem; font-weight: 500; margin: 1.25rem 0 0.75rem; color: var(--text-secondary); }
+
+  .chart-wrap { position: relative; width: 100%; height: 320px; }
+  .chart-wrap-sm { height: 260px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 0.75rem; color: var(--text-secondary); }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 900px) { .three-col { grid-template-columns: 1fr; } }
+  @media (max-width: 768px) { .two-col { grid-template-columns: 1fr; } }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  th { text-align: left; font-weight: 500; color: var(--text-secondary); padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+  tr:last-child td { border-bottom: none; }
+
+  .formula-box { background: var(--accent-3c-bg); border-radius: 8px; padding: 1rem 1.25rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; line-height: 1.8; color: var(--text); margin-bottom: 1rem; }
+  .formula-box.purple { background: var(--accent-4c-bg); }
+  .formula-box .result { color: var(--accent-3c); font-weight: 500; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); padding-bottom: 0; }
+  .tab { padding: 8px 16px; font-size: 0.8rem; font-weight: 400; color: var(--text-secondary); cursor: pointer; border: none; background: none; border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: inherit; transition: all 0.15s; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--text); font-weight: 500; border-bottom-color: var(--text); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .actions { display: flex; gap: 8px; margin-top: 1rem; flex-wrap: wrap; }
+  button.btn { font-family: inherit; font-size: 0.8rem; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); cursor: pointer; font-weight: 500; transition: all 0.15s; }
+  button.btn:hover { border-color: var(--border-hover); background: var(--bg); }
+  button.btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+  button.btn.primary:hover { opacity: 0.85; }
+
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--bg-card); border-radius: 14px; padding: 2rem; max-width: 520px; width: 90%; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+  .modal h3 { font-size: 1.1rem; font-weight: 500; margin-bottom: 1rem; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-group label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; font-weight: 500; }
+  .form-group input, .form-group textarea { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-input); color: var(--text); outline: none; transition: border 0.15s; }
+  .form-group input:focus, .form-group textarea:focus { border-color: var(--border-hover); }
+  .note-box { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; padding: 0.75rem; background: var(--bg); border-radius: 6px; margin-bottom: 1rem; }
+
+  /* Body silhouette fat map */
+  .body-map { display: flex; justify-content: center; align-items: center; gap: 2rem; flex-wrap: wrap; }
+  .body-svg-wrap { position: relative; width: 220px; }
+  .fat-map-legend { font-size: 0.75rem; color: var(--text-secondary); }
+  .fat-map-legend .bar { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .fat-map-legend .bar-fill { height: 14px; border-radius: 3px; min-width: 4px; transition: width 0.4s; }
+  .fat-map-legend .bar-label { min-width: 80px; }
+  .fat-map-legend .bar-value { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; min-width: 60px; text-align: right; }
+
+  /* Risk gauge */
+  .gauge-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .gauge-label { font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em; }
+  .gauge-value { font-size: 2rem; font-weight: 500; font-family: 'JetBrains Mono', monospace; }
+  .gauge-sub { font-size: 0.8rem; font-weight: 500; }
+
+  .risk-factors { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 1rem; }
+  @media (max-width: 600px) { .risk-factors { grid-template-columns: 1fr; } }
+  .risk-factor { background: var(--bg); border-radius: 8px; padding: 0.75rem 1rem; }
+  .risk-factor .rf-label { font-size: 0.7rem; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.03em; }
+  .risk-factor .rf-value { font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 500; margin: 2px 0; }
+  .risk-factor .rf-status { font-size: 0.7rem; font-weight: 500; }
+  .rf-status.good { color: var(--accent-3c); }
+  .rf-status.moderate { color: var(--warning); }
+  .rf-status.high { color: var(--danger); }
+
+  .impedance-table td:first-child { font-weight: 500; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Composição corporal — painel de evolução</h1>
+  <p>Adipômetro + BIA Multilaser + modelos multicompartimentais + análise avançada</p>
+</header>
+
+<div id="metrics-summary" class="metric-grid"></div>
+
+<!-- BF% chart -->
+<div class="section">
+  <h2>Percentual de gordura corporal <span class="method-tag tag-3c">4 métodos</span></h2>
+  <div class="chart-wrap"><canvas id="bfChart"></canvas></div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#c44d20"></div>Adipômetro (Siri 2C)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#2a6cb8"></div>BIA Multilaser</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#148060"></div>Modelo 3C (Lohman)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#7c3aad; border-radius:50%"></div>Modelo 4C (Heymsfield)</div>
+  </div>
+</div>
+
+<!-- Mass + Weight -->
+<div class="two-col">
+  <div class="section">
+    <h2>Composição por massa <span class="method-tag tag-adipo">adipômetro</span></h2>
+    <div class="chart-wrap chart-wrap-sm"><canvas id="massChart"></canvas></div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#c44d20"></div>Gordura (kg) — eixo esquerdo</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#2a6cb8"></div>Massa magra (kg) — eixo direito</div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>Peso corporal</h2>
+    <div class="chart-wrap chart-wrap-sm"><canvas id="weightChart"></canvas></div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#c44d20"></div>Adipômetro</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#2a6cb8"></div>BIA</div>
+    </div>
+  </div>
+</div>
+
+<!-- Metabolic Risk Score -->
+<div class="section">
+  <h2>Score de risco metabólico composto</h2>
+  <div id="risk-score-content"></div>
+</div>
+
+<!-- Fat Distribution Map -->
+<div class="section">
+  <h2>Mapa de distribuição de gordura <span class="method-tag tag-adipo">subcutânea</span> <span class="method-tag tag-bia">segmental</span></h2>
+  <div id="fat-map-content"></div>
+</div>
+
+<!-- ECW/ICW -->
+<div class="section">
+  <h2>Razão ECW/ICW — hidratação segmental <span class="method-tag tag-bia">impedância dual</span></h2>
+  <div id="ecw-icw-content"></div>
+</div>
+
+<!-- Model details -->
+<div class="section">
+  <h2>Modelos 3C e 4C — cálculos</h2>
+  <div id="model-details"></div>
+</div>
+
+<!-- Data tables -->
+<div class="section">
+  <h2>Dados detalhados</h2>
+  <div class="tabs">
+    <button class="tab active" data-tab="tab-adipo">Adipômetro</button>
+    <button class="tab" data-tab="tab-bia">BIA Multilaser</button>
+    <button class="tab" data-tab="tab-impedance">Impedância</button>
+  </div>
+  <div id="tab-adipo" class="tab-content active"></div>
+  <div id="tab-bia" class="tab-content"></div>
+  <div id="tab-impedance" class="tab-content"></div>
+</div>
+
+<!-- Data management -->
+<div class="section">
+  <h2>Gerenciar dados</h2>
+  <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:1rem;">Adicione novas medições ou exporte/importe os dados para manter backup.</p>
+  <div class="actions">
+    <button class="btn primary" onclick="openModal('adipo')">+ Adipômetro</button>
+    <button class="btn primary" onclick="openModal('bia')">+ BIA</button>
+    <button class="btn" onclick="exportData()">Exportar JSON</button>
+    <button class="btn" onclick="document.getElementById('importInput').click()">Importar JSON</button>
+    <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)">
+    <button class="btn" onclick="importCSV()">Importar CSV Fitdays</button>
+    <input type="file" id="csvInput" accept=".csv,.tsv,.txt" style="display:none" onchange="handleCSV(event)">
+  </div>
+</div>
+
+<!-- Modal: adipometer -->
+<div class="modal-overlay" id="modal-adipo">
+  <div class="modal">
+    <h3>Nova medição — adipômetro</h3>
+    <div class="form-grid">
+      <div class="form-group"><label>Data</label><input type="date" id="a-date"></div>
+      <div class="form-group"><label>Peso (kg)</label><input type="number" step="0.1" id="a-weight"></div>
+      <div class="form-group"><label>Tricipital (mm)</label><input type="number" step="0.1" id="a-tricep"></div>
+      <div class="form-group"><label>Abdominal (mm)</label><input type="number" step="0.1" id="a-abdom"></div>
+      <div class="form-group"><label>Subescapular (mm)</label><input type="number" step="0.1" id="a-subsc"></div>
+      <div class="form-group"><label>Axilar média (mm)</label><input type="number" step="0.1" id="a-axil"></div>
+      <div class="form-group"><label>Torácica (mm)</label><input type="number" step="0.1" id="a-chest"></div>
+      <div class="form-group"><label>Suprailíaca (mm)</label><input type="number" step="0.1" id="a-supra"></div>
+      <div class="form-group"><label>Coxa (mm)</label><input type="number" step="0.1" id="a-thigh"></div>
+      <div class="form-group"><label>Cintura (cm)</label><input type="number" step="0.1" id="a-waist"></div>
+      <div class="form-group"><label>Quadril (cm)</label><input type="number" step="0.1" id="a-hip"></div>
+      <div class="form-group"><label>Idade (anos)</label><input type="number" id="a-age" value="34"></div>
+    </div>
+    <div class="note-box">A densidade corporal é calculada via Jackson-Pollock 7 dobras. O %GC usa a equação de Siri.</div>
+    <div class="actions">
+      <button class="btn primary" onclick="saveAdipo()">Salvar</button>
+      <button class="btn" onclick="closeModals()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: BIA -->
+<div class="modal-overlay" id="modal-bia">
+  <div class="modal">
+    <h3>Nova medição — BIA Multilaser</h3>
+    <div class="form-grid">
+      <div class="form-group"><label>Data</label><input type="date" id="b-date"></div>
+      <div class="form-group"><label>Peso (kg)</label><input type="number" step="0.1" id="b-weight"></div>
+      <div class="form-group"><label>Gordura corporal (%)</label><input type="number" step="0.1" id="b-bf"></div>
+      <div class="form-group"><label>Água corporal (%)</label><input type="number" step="0.1" id="b-water"></div>
+      <div class="form-group"><label>Músculo esquelético (%)</label><input type="number" step="0.1" id="b-muscle"></div>
+      <div class="form-group"><label>Massa muscular (kg)</label><input type="number" step="0.1" id="b-musclemass"></div>
+      <div class="form-group"><label>Massa óssea (kg)</label><input type="number" step="0.1" id="b-bone"></div>
+      <div class="form-group"><label>Gordura visceral</label><input type="number" step="0.1" id="b-visceral"></div>
+    </div>
+    <p style="font-size:0.8rem; font-weight:500; margin:0.75rem 0 0.5rem;">Impedância segmental (opcional)</p>
+    <div class="form-grid">
+      <div class="form-group"><label>Braço dir. 20kHz (Ω)</label><input type="number" step="0.1" id="b-ra20"></div>
+      <div class="form-group"><label>Braço dir. 100kHz (Ω)</label><input type="number" step="0.1" id="b-ra100"></div>
+      <div class="form-group"><label>Braço esq. 20kHz (Ω)</label><input type="number" step="0.1" id="b-la20"></div>
+      <div class="form-group"><label>Braço esq. 100kHz (Ω)</label><input type="number" step="0.1" id="b-la100"></div>
+      <div class="form-group"><label>Tronco 20kHz (Ω)</label><input type="number" step="0.1" id="b-tr20"></div>
+      <div class="form-group"><label>Tronco 100kHz (Ω)</label><input type="number" step="0.1" id="b-tr100"></div>
+      <div class="form-group"><label>Perna dir. 20kHz (Ω)</label><input type="number" step="0.1" id="b-rl20"></div>
+      <div class="form-group"><label>Perna dir. 100kHz (Ω)</label><input type="number" step="0.1" id="b-rl100"></div>
+      <div class="form-group"><label>Perna esq. 20kHz (Ω)</label><input type="number" step="0.1" id="b-ll20"></div>
+      <div class="form-group"><label>Perna esq. 100kHz (Ω)</label><input type="number" step="0.1" id="b-ll100"></div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" onclick="saveBIA()">Salvar</button>
+      <button class="btn" onclick="closeModals()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const HEIGHT_CM = 184;
+
+let adipoData = [
+  { date:'2025-06-27', weight:118.6, skinfolds:{tricep:12,abdom:40.5,subsc:35,axil:24.5,chest:26,supra:28,thigh:15}, waist:112, hip:112, age:33, density:1.041, bf:24.6, fatMass:29.2, ffm:89.4 },
+  { date:'2025-08-26', weight:116.3, skinfolds:{tricep:12.2,abdom:32.5,subsc:32.5,axil:23.5,chest:16.5,supra:22.5,thigh:12.5}, waist:108, hip:116, age:33, density:1.049, bf:21.6, fatMass:25.1, ffm:91.2 },
+  { date:'2025-11-10', weight:112.2, skinfolds:{tricep:11.8,abdom:31.8,subsc:28.5,axil:21.8,chest:15.3,supra:21.5,thigh:11.7}, waist:104, hip:113, age:33, density:1.051, bf:20.5, fatMass:23.0, ffm:89.2 },
+  { date:'2026-01-12', weight:109.4, skinfolds:{tricep:10.2,abdom:27.2,subsc:27.8,axil:20.4,chest:14.8,supra:20.2,thigh:10.8}, waist:103, hip:110.5, age:34, density:1.054, bf:19.3, fatMass:21.1, ffm:88.3 },
+  { date:'2026-03-09', weight:106.5, skinfolds:{tricep:10,abdom:25.8,subsc:27,axil:19.8,chest:14.2,supra:18.7,thigh:10.4}, waist:101, hip:106.5, age:34, density:1.056, bf:18.6, fatMass:19.8, ffm:86.7 }
+];
+
+let biaData = [
+  { date:'2026-03-14', weight:104.3, bf:23.5, water:56.0, skMuscle:44.2, muscleMass:74.4, boneMass:5.3, visceral:9.0,
+    impedance:{rArm:[250.6,210.9],lArm:[257.1,216.1],trunk:[22.4,21.1],rLeg:[238.7,198.6],lLeg:[240.9,200.7]},
+    segFat:{lArm:1.5,rArm:1.5,trunk:12.7,lLeg:3.6,rLeg:3.6} },
+  { date:'2026-03-15', weight:105.0, bf:23.6, water:56.0, skMuscle:44.2, muscleMass:74.9, boneMass:5.4, visceral:9.0,
+    impedance:{rArm:[250.1,210.9],lArm:[256.8,216.1],trunk:[21.8,20.5],rLeg:[236.6,197.1],lLeg:[236.7,197.6]},
+    segFat:{lArm:1.5,rArm:1.5,trunk:12.8,lLeg:3.7,rLeg:3.7} },
+  { date:'2026-03-22', weight:104.1, bf:23.1, water:56.4, skMuscle:44.5, muscleMass:74.7, boneMass:5.4, visceral:9.0,
+    impedance:{rArm:[250.3,211.4],lArm:[253.1,215.6],trunk:[23.1,20.2],rLeg:[237.6,197.6],lLeg:[234.1,196.3]},
+    segFat:{lArm:1.4,rArm:1.4,trunk:12.5,lLeg:3.6,rLeg:3.5} }
+];
+
+// ============================================================
+// CALCULATIONS
+// ============================================================
+function jacksonPollock7(sf, age) {
+  const sum = sf.chest + sf.abdom + sf.thigh + sf.tricep + sf.subsc + sf.supra + sf.axil;
+  const density = 1.112 - 0.00043499 * sum + 0.00000055 * sum * sum - 0.00028826 * age;
+  return { density, sum };
+}
+
+function siriBF(density) { return (4.95 / density - 4.50) * 100; }
+
+function model3C(density, tbwKg, weightKg) {
+  return (2.118 / density - 0.78 * (tbwKg / weightKg) - 1.354) * 100;
+}
+
+// 4C model: Heymsfield (1996)
+// %BF = (2.747/Db - 0.714*(TBW/BW) + 1.146*(Mo/BW) - 2.0503) * 100
+// Mo = total body mineral. Bone mineral (from BIA) is ~77.9% of total mineral
+// so Mo = boneMass / 0.779
+function model4C(density, tbwKg, boneMassKg, weightKg) {
+  const Mo = boneMassKg / 0.779;
+  return (2.747 / density - 0.714 * (tbwKg / weightKg) + 1.146 * (Mo / weightKg) - 2.0503) * 100;
+}
+
+// ECW/ICW ratio from dual-frequency impedance
+// Z20/Z100 ratio: higher = more ECW relative to ICW
+function ecwIcwRatio(z20, z100) {
+  if (!z100 || z100 === 0) return null;
+  return z20 / z100;
+}
+
+// Metabolic risk score (0-100, lower is better)
+// Components: RCQ, visceral fat, %BF (3C or adipo), ECW/ICW mean
+function computeMetabolicRisk(adipoEntry, biaEntry, bf3c) {
+  let score = 0;
+  let factors = [];
+
+  // 1. RCQ (men: <0.85 optimal, 0.85-0.95 elevated, >0.95 high)
+  const rcq = (adipoEntry.waist && adipoEntry.hip) ? adipoEntry.waist / adipoEntry.hip : null;
+  if (rcq !== null) {
+    let rcqScore, rcqStatus;
+    if (rcq < 0.85) { rcqScore = 0; rcqStatus = 'good'; }
+    else if (rcq < 0.90) { rcqScore = 10; rcqStatus = 'moderate'; }
+    else if (rcq < 0.95) { rcqScore = 18; rcqStatus = 'moderate'; }
+    else if (rcq < 1.00) { rcqScore = 23; rcqStatus = 'high'; }
+    else { rcqScore = 25; rcqStatus = 'high'; }
+    score += rcqScore;
+    factors.push({ label: 'Relação cintura/quadril', value: rcq.toFixed(2), max: 25, current: rcqScore, status: rcqStatus, ref: '<0.85 ótimo, 0.85-0.95 elevado, >0.95 alto' });
+  }
+
+  // 2. Visceral fat (BIA scale: 1-9 normal, 10-14 high, 15+ very high)
+  if (biaEntry && biaEntry.visceral != null) {
+    const vf = biaEntry.visceral;
+    let vfScore, vfStatus;
+    if (vf <= 5) { vfScore = 0; vfStatus = 'good'; }
+    else if (vf <= 9) { vfScore = 10; vfStatus = 'moderate'; }
+    else if (vf <= 14) { vfScore = 20; vfStatus = 'high'; }
+    else { vfScore = 25; vfStatus = 'high'; }
+    score += vfScore;
+    factors.push({ label: 'Gordura visceral (BIA)', value: vf.toFixed(0), max: 25, current: vfScore, status: vfStatus, ref: '1-9 normal, 10-14 alto, >14 muito alto' });
+  }
+
+  // 3. %BF (men: <15 athletic, 15-20 fit, 20-25 average, >25 high)
+  const bf = bf3c || adipoEntry.bf;
+  if (bf != null) {
+    let bfScore, bfStatus;
+    if (bf < 15) { bfScore = 0; bfStatus = 'good'; }
+    else if (bf < 20) { bfScore = 8; bfStatus = 'good'; }
+    else if (bf < 25) { bfScore = 16; bfStatus = 'moderate'; }
+    else if (bf < 30) { bfScore = 22; bfStatus = 'high'; }
+    else { bfScore = 25; bfStatus = 'high'; }
+    score += bfScore;
+    factors.push({ label: '% gordura (melhor estimativa)', value: bf.toFixed(1) + '%', max: 25, current: bfScore, status: bfStatus, ref: '<15% atlético, 15-20% fit, 20-25% médio' });
+  }
+
+  // 4. ECW/ICW mean ratio (1.0-1.15 normal, 1.15-1.25 elevated, >1.25 high)
+  if (biaEntry && biaEntry.impedance) {
+    const imp = biaEntry.impedance;
+    const ratios = [imp.rArm, imp.lArm, imp.trunk, imp.rLeg, imp.lLeg]
+      .filter(p => p && p[1] > 0)
+      .map(p => p[0] / p[1]);
+    if (ratios.length > 0) {
+      const meanRatio = ratios.reduce((a,b) => a+b, 0) / ratios.length;
+      let eiScore, eiStatus;
+      if (meanRatio < 1.15) { eiScore = 0; eiStatus = 'good'; }
+      else if (meanRatio < 1.20) { eiScore = 8; eiStatus = 'moderate'; }
+      else if (meanRatio < 1.25) { eiScore = 16; eiStatus = 'moderate'; }
+      else { eiScore = 25; eiStatus = 'high'; }
+      score += eiScore;
+      factors.push({ label: 'Razão ECW/ICW média', value: meanRatio.toFixed(3), max: 25, current: eiScore, status: eiStatus, ref: '<1.15 normal, 1.15-1.25 elevado, >1.25 alto' });
+    }
+  }
+
+  const maxPossible = factors.reduce((s,f) => s + f.max, 0);
+  const normalized = maxPossible > 0 ? Math.round(score / maxPossible * 100) : 0;
+
+  return { score: normalized, raw: score, max: maxPossible, factors };
+}
+
+function findClosestBIA(adipoDate, windowDays) {
+  windowDays = windowDays || 30;
+  const ad = new Date(adipoDate).getTime();
+  let closest = null, minDiff = Infinity;
+  for (const b of biaData) {
+    const diff = Math.abs(new Date(b.date).getTime() - ad);
+    if (diff < minDiff && diff < windowDays * 24 * 3600 * 1000) { minDiff = diff; closest = b; }
+  }
+  return closest;
+}
+
+function computeModelEntries() {
+  const entries = [];
+  for (const a of adipoData) {
+    const b = findClosestBIA(a.date);
+    if (!b || !b.water) continue;
+    const tbwKg = b.water / 100 * b.weight;
+    const avgWeight = (a.weight + b.weight) / 2;
+    const bf3c = model3C(a.density, tbwKg, avgWeight);
+    let bf4c = null;
+    if (b.boneMass) { bf4c = model4C(a.density, tbwKg, b.boneMass, avgWeight); }
+    entries.push({ adipoDate: a.date, biaDate: b.date, density: a.density, tbwKg, avgWeight, bf3c, bf4c, bfAdipo: a.bf, bfBIA: b.bf, boneMass: b.boneMass });
+  }
+  return entries;
+}
+
+// ============================================================
+// FORMATTING
+// ============================================================
+function fmtDate(d) { return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'}); }
+function fmtShortDate(d) { return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}); }
+
+// ============================================================
+// RENDERING
+// ============================================================
+function renderSummary() {
+  const lastA = adipoData[adipoData.length - 1];
+  const prevA = adipoData.length > 1 ? adipoData[adipoData.length - 2] : null;
+  const lastB = biaData[biaData.length - 1];
+  const entries = computeModelEntries();
+  const last = entries.length > 0 ? entries[entries.length - 1] : null;
+  const firstA = adipoData[0];
+  const deltaBF = prevA ? (lastA.bf - prevA.bf).toFixed(1) : null;
+
+  let html = `
+    <div class="metric-card">
+      <div class="label">Peso atual</div>
+      <div class="value">${(lastB||lastA).weight.toFixed(1)}</div>
+      <div class="sub">kg — perdidos: <strong>${(firstA.weight - (lastB||lastA).weight).toFixed(1)} kg</strong></div>
+    </div>
+    <div class="metric-card">
+      <div class="label">%GC <span class="method-tag tag-adipo">adipo</span></div>
+      <div class="value" style="color:var(--accent-adipo)">${lastA.bf.toFixed(1)}%</div>
+      <div class="sub">${deltaBF ? `<span class="delta ${Number(deltaBF)<=0?'down':'up'}">${deltaBF}pp</span> vs anterior` : ''}</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">%GC <span class="method-tag tag-bia">BIA</span></div>
+      <div class="value" style="color:var(--accent-bia)">${lastB ? lastB.bf.toFixed(1)+'%' : '—'}</div>
+      <div class="sub">${lastB ? fmtDate(lastB.date) : ''}</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">%GC <span class="method-tag tag-3c">3C</span></div>
+      <div class="value" style="color:var(--accent-3c)">${last ? last.bf3c.toFixed(1)+'%' : '—'}</div>
+      <div class="sub">${last ? 'Lohman' : 'pareamento pendente'}</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">%GC <span class="method-tag tag-4c">4C</span></div>
+      <div class="value" style="color:var(--accent-4c)">${last && last.bf4c != null ? last.bf4c.toFixed(1)+'%' : '—'}</div>
+      <div class="sub">${last && last.bf4c != null ? 'Heymsfield' : 'precisa massa óssea'}</div>
+    </div>
+    <div class="metric-card">
+      <div class="label">Massa gorda</div>
+      <div class="value">${lastA.fatMass.toFixed(1)}</div>
+      <div class="sub">kg — eliminados: <strong>${(firstA.fatMass - lastA.fatMass).toFixed(1)} kg</strong></div>
+    </div>`;
+  document.getElementById('metrics-summary').innerHTML = html;
+}
+
+let chartBF, chartMass, chartWeight;
+
+function renderCharts() {
+  const isDark = matchMedia('(prefers-color-scheme:dark)').matches;
+  const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+  const tickColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
+
+  const entries = computeModelEntries();
+  const adipoBFP = adipoData.map(d => ({x:d.date,y:d.bf}));
+  const biaBFP = biaData.map(d => ({x:d.date,y:d.bf}));
+  const bf3cP = entries.map(e => ({x:e.adipoDate,y:e.bf3c}));
+  const bf4cP = entries.filter(e => e.bf4c!=null).map(e => ({x:e.adipoDate,y:e.bf4c}));
+
+  // Compute dynamic y-axis bounds for BF chart with 2% padding
+  const allBFValues = [...adipoBFP, ...biaBFP, ...bf3cP, ...bf4cP].map(p => p.y).filter(v => v != null);
+  const bfMin = allBFValues.length > 0 ? Math.floor(Math.min(...allBFValues) - 2) : 10;
+  const bfMax = allBFValues.length > 0 ? Math.ceil(Math.max(...allBFValues) + 2) : 35;
+
+  if (chartBF) chartBF.destroy();
+  chartBF = new Chart(document.getElementById('bfChart'), {
+    type:'line',
+    data:{datasets:[
+      {label:'Adipômetro',data:adipoBFP,borderColor:'#c44d20',backgroundColor:'#c44d20',pointRadius:5,borderWidth:2.5,tension:0.3},
+      {label:'BIA',data:biaBFP,borderColor:'#2a6cb8',backgroundColor:'#2a6cb8',pointRadius:5,borderWidth:2.5,tension:0.3},
+      {label:'3C',data:bf3cP,borderColor:'#148060',backgroundColor:'#148060',pointRadius:6,borderWidth:2,borderDash:[6,4],tension:0.3},
+      {label:'4C',data:bf4cP,borderColor:'#7c3aad',backgroundColor:'#7c3aad',pointRadius:7,pointStyle:'rectRot',borderWidth:2,borderDash:[3,3],tension:0.3}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)+'%'}}},
+      scales:{
+        x:{type:'time',time:{unit:'month',tooltipFormat:'dd MMM yyyy'},grid:{display:false},ticks:{color:tickColor,font:{size:11}}},
+        y:{min:bfMin,max:bfMax,ticks:{color:tickColor,callback:v=>v+'%'},grid:{color:gridColor}}
+      }
+    }
+  });
+
+  // Mass chart: two separate lines (fat mass declining, FFM trend) — adipometer data only
+  if (chartMass) chartMass.destroy();
+  chartMass = new Chart(document.getElementById('massChart'), {
+    type:'line',
+    data:{datasets:[
+      {label:'Massa gorda',data:adipoData.map(d=>({x:d.date,y:d.fatMass})),borderColor:'#c44d20',backgroundColor:'rgba(196,77,32,0.1)',pointRadius:5,borderWidth:2.5,tension:0.3,fill:true},
+      {label:'Massa livre de gordura',data:adipoData.map(d=>({x:d.date,y:d.ffm})),borderColor:'#2a6cb8',backgroundColor:'rgba(42,108,184,0.1)',pointRadius:5,borderWidth:2.5,tension:0.3,fill:true,yAxisID:'y1'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)+' kg'}}},
+      scales:{
+        x:{type:'time',time:{unit:'month',tooltipFormat:'dd MMM yyyy'},grid:{display:false},ticks:{color:tickColor,font:{size:11}}},
+        y:{position:'left',title:{display:true,text:'Gordura (kg)',color:tickColor,font:{size:10}},ticks:{color:'#c44d20',callback:v=>v+'kg'},grid:{color:gridColor}},
+        y1:{position:'right',title:{display:true,text:'Massa magra (kg)',color:tickColor,font:{size:10}},ticks:{color:'#2a6cb8',callback:v=>v+'kg'},grid:{display:false}}
+      }
+    }
+  });
+
+  if (chartWeight) chartWeight.destroy();
+  chartWeight = new Chart(document.getElementById('weightChart'), {
+    type:'line',
+    data:{datasets:[
+      {label:'Adipômetro',data:adipoData.map(d=>({x:d.date,y:d.weight})),borderColor:'#c44d20',backgroundColor:'#c44d20',pointRadius:4,borderWidth:2,tension:0.3},
+      {label:'BIA',data:biaData.map(d=>({x:d.date,y:d.weight})),borderColor:'#2a6cb8',backgroundColor:'#2a6cb8',pointRadius:4,borderWidth:2,tension:0.3}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)+' kg'}}},
+      scales:{
+        x:{type:'time',time:{unit:'month',tooltipFormat:'dd MMM yyyy'},grid:{display:false},ticks:{color:tickColor,font:{size:11}}},
+        y:{ticks:{color:tickColor,callback:v=>v+'kg'},grid:{color:gridColor}}
+      }
+    }
+  });
+}
+
+// ============================================================
+// METABOLIC RISK SCORE
+// ============================================================
+function renderRiskScore() {
+  const lastA = adipoData[adipoData.length - 1];
+  const lastB = biaData.length > 0 ? biaData[biaData.length - 1] : null;
+  const entries = computeModelEntries();
+  const last3c = entries.length > 0 ? entries[entries.length - 1].bf3c : null;
+
+  const risk = computeMetabolicRisk(lastA, lastB, last3c);
+
+  let riskColor, riskLabel;
+  if (risk.score <= 25) { riskColor = 'var(--accent-3c)'; riskLabel = 'Baixo'; }
+  else if (risk.score <= 50) { riskColor = 'var(--warning)'; riskLabel = 'Moderado'; }
+  else if (risk.score <= 75) { riskColor = '#c44d20'; riskLabel = 'Elevado'; }
+  else { riskColor = 'var(--danger)'; riskLabel = 'Alto'; }
+
+  let html = `
+    <div style="display:flex;align-items:center;gap:2rem;flex-wrap:wrap;margin-bottom:1rem;">
+      <div class="gauge-wrap">
+        <div class="gauge-label">Score composto</div>
+        <div class="gauge-value" style="color:${riskColor}">${risk.score}</div>
+        <div class="gauge-sub" style="color:${riskColor}">${riskLabel}</div>
+        <div style="font-size:0.7rem;color:var(--text-tertiary);margin-top:2px;">0 (ótimo) — 100 (alto risco)</div>
+      </div>
+      <div style="flex:1;min-width:200px;">
+        <div style="height:12px;background:var(--bg);border-radius:6px;overflow:hidden;margin-bottom:6px;">
+          <div style="height:100%;width:${risk.score}%;border-radius:6px;background:linear-gradient(90deg, #148060, #a07010, #c44d20, #b83030);transition:width 0.5s;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:var(--text-tertiary);">
+          <span>0 — ótimo</span><span>25</span><span>50</span><span>75</span><span>100 — alto</span>
+        </div>
+      </div>
+    </div>
+    <div class="risk-factors">`;
+
+  for (const f of risk.factors) {
+    html += `
+      <div class="risk-factor">
+        <div class="rf-label">${f.label}</div>
+        <div class="rf-value">${f.value}</div>
+        <div class="rf-status ${f.status}">${f.current}/${f.max} pts — ${f.status === 'good' ? 'adequado' : f.status === 'moderate' ? 'atenção' : 'risco'}</div>
+        <div style="font-size:0.65rem;color:var(--text-tertiary);margin-top:2px;">Ref: ${f.ref}</div>
+      </div>`;
+  }
+  html += '</div>';
+  document.getElementById('risk-score-content').innerHTML = html;
+}
+
+// ============================================================
+// FAT DISTRIBUTION MAP
+// ============================================================
+function renderFatMap() {
+  const lastA = adipoData[adipoData.length - 1];
+  let lastB = biaData.length > 0 ? biaData[biaData.length - 1] : null;
+
+  if (!lastA || !lastB) {
+    document.getElementById('fat-map-content').innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;">Precisa de dados de ambos os métodos.</p>';
+    return;
+  }
+
+  const hasSegFat = lastB.segFat && (lastB.segFat.trunk > 0 || lastB.segFat.lArm > 0);
+
+  if (!hasSegFat) {
+    // Try finding any BIA entry with segFat
+    const withSeg = biaData.filter(b => b.segFat && (b.segFat.trunk > 0 || b.segFat.lArm > 0));
+    if (withSeg.length > 0) {
+      lastB = withSeg[withSeg.length - 1];
+    }
+  }
+
+  // Skinfold sites mapped to body regions
+  const sf = lastA.skinfolds;
+  const skinfoldMap = [
+    { region: 'Tríceps (braço)', value: sf.tricep, max: 40, color: '#c44d20' },
+    { region: 'Subescapular (costas)', value: sf.subsc, max: 40, color: '#c44d20' },
+    { region: 'Torácica (peito)', value: sf.chest, max: 40, color: '#c44d20' },
+    { region: 'Axilar média', value: sf.axil, max: 40, color: '#c44d20' },
+    { region: 'Abdominal', value: sf.abdom, max: 50, color: '#c44d20' },
+    { region: 'Suprailíaca (quadril)', value: sf.supra, max: 40, color: '#c44d20' },
+    { region: 'Coxa', value: sf.thigh, max: 30, color: '#c44d20' }
+  ];
+
+  // BIA segmental fat
+  const seg = lastB.segFat || {};
+  const hasSegData = seg.trunk > 0 || seg.lArm > 0 || seg.rArm > 0;
+  const biaSegMap = [
+    { region: 'Braço esquerdo', value: seg.lArm || 0, max: 5, color: '#2a6cb8' },
+    { region: 'Braço direito', value: seg.rArm || 0, max: 5, color: '#2a6cb8' },
+    { region: 'Tronco', value: seg.trunk || 0, max: 20, color: '#2a6cb8' },
+    { region: 'Perna esquerda', value: seg.lLeg || 0, max: 8, color: '#2a6cb8' },
+    { region: 'Perna direita', value: seg.rLeg || 0, max: 8, color: '#2a6cb8' }
+  ];
+
+  // Estimate visceral vs subcutaneous
+  const trunkSubcutMM = sf.abdom + sf.supra + sf.subsc;
+  const trunkTotalBIA = seg.trunk || 0;
+  const maxTrunkSubcut = 120;
+  const subcutProp = Math.min(trunkSubcutMM / maxTrunkSubcut, 0.85);
+  const estSubcutKg = trunkTotalBIA * subcutProp;
+  const estVisceralKg = trunkTotalBIA - estSubcutKg;
+
+  let html = '<div class="two-col">';
+
+  // Left: skinfold bars
+  html += '<div><h3>Dobras cutâneas — gordura subcutânea (mm)</h3>';
+  for (const s of skinfoldMap) {
+    const pct = Math.min(s.value / s.max * 100, 100);
+    html += `<div style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:2px;">
+        <span style="color:var(--text-secondary)">${s.region}</span>
+        <span style="font-family:'JetBrains Mono',monospace;color:var(--accent-adipo)">${s.value} mm</span>
+      </div>
+      <div style="height:10px;background:var(--bg);border-radius:5px;overflow:hidden;">
+        <div style="height:100%;width:${pct}%;background:${s.color};opacity:0.7;border-radius:5px;transition:width 0.4s;"></div>
+      </div>
+    </div>`;
+  }
+  html += '</div>';
+
+  // Right: BIA segmental + visceral estimate
+  html += '<div><h3>Gordura segmental — BIA (kg)</h3>';
+
+  if (!hasSegData) {
+    html += `<div class="note-box" style="margin-top:0.5rem;">
+      Dados de gordura segmental não encontrados nos registros BIA atuais. Re-importe o CSV do Fitdays para preencher esses campos — a v2 do dashboard agora faz merge dos dados novos nos registros existentes.
+    </div>`;
+  } else {
+  for (const s of biaSegMap) {
+    const pct = Math.min(s.value / s.max * 100, 100);
+    html += `<div style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:2px;">
+        <span style="color:var(--text-secondary)">${s.region}</span>
+        <span style="font-family:'JetBrains Mono',monospace;color:var(--accent-bia)">${s.value.toFixed(1)} kg</span>
+      </div>
+      <div style="height:10px;background:var(--bg);border-radius:5px;overflow:hidden;">
+        <div style="height:100%;width:${pct}%;background:${s.color};opacity:0.7;border-radius:5px;transition:width 0.4s;"></div>
+      </div>
+    </div>`;
+  }
+
+  // Visceral vs subcutaneous estimate
+  html += `<h3 style="margin-top:1.5rem">Estimativa tronco: visceral vs subcutânea</h3>
+    <div style="display:flex;gap:12px;margin-top:8px;">
+      <div style="flex:1;background:var(--accent-adipo-bg);border-radius:8px;padding:0.75rem;text-align:center;">
+        <div style="font-size:0.65rem;color:var(--text-tertiary);text-transform:uppercase;">Subcutânea</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:1.2rem;font-weight:500;color:var(--accent-adipo)">${estSubcutKg.toFixed(1)} kg</div>
+        <div style="font-size:0.7rem;color:var(--text-secondary)">${(subcutProp*100).toFixed(0)}% do tronco</div>
+      </div>
+      <div style="flex:1;background:var(--danger-bg);border-radius:8px;padding:0.75rem;text-align:center;">
+        <div style="font-size:0.65rem;color:var(--text-tertiary);text-transform:uppercase;">Visceral (estimada)</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:1.2rem;font-weight:500;color:var(--danger)">${estVisceralKg.toFixed(1)} kg</div>
+        <div style="font-size:0.7rem;color:var(--text-secondary)">${((1-subcutProp)*100).toFixed(0)}% do tronco</div>
+      </div>
+    </div>
+    <div style="font-size:0.7rem;color:var(--text-tertiary);margin-top:6px;">Estimativa cruzada: dobras do tronco (adipômetro) vs gordura segmental do tronco (BIA). A gordura que a BIA detecta mas as dobras não alcançam é atribuída como visceral.</div>`;
+  } // end else hasSegData
+
+  html += '</div></div>';
+  document.getElementById('fat-map-content').innerHTML = html;
+}
+
+// ============================================================
+// ECW/ICW RATIO
+// ============================================================
+function renderECWICW() {
+  const withImp = biaData.filter(b => b.impedance);
+  if (withImp.length === 0) {
+    document.getElementById('ecw-icw-content').innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;">Sem dados de impedância segmental.</p>';
+    return;
+  }
+
+  const segments = ['rArm','lArm','trunk','rLeg','lLeg'];
+  const segLabels = { rArm:'Braço D', lArm:'Braço E', trunk:'Tronco', rLeg:'Perna D', lLeg:'Perna E' };
+
+  // Latest ratios
+  const latest = withImp[withImp.length - 1];
+  const latestRatios = {};
+  let meanRatio = 0, count = 0;
+  for (const s of segments) {
+    if (latest.impedance[s] && latest.impedance[s][1] > 0) {
+      latestRatios[s] = latest.impedance[s][0] / latest.impedance[s][1];
+      meanRatio += latestRatios[s];
+      count++;
+    }
+  }
+  meanRatio = count > 0 ? meanRatio / count : 0;
+
+  let html = '<div class="two-col">';
+
+  // Left: segmental ratios
+  html += '<div>';
+  html += `<div style="margin-bottom:1rem;">
+    <div style="font-size:0.75rem;color:var(--text-tertiary);text-transform:uppercase;">Razão Z20/Z100 média</div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:1.8rem;font-weight:500;">${meanRatio.toFixed(3)}</div>
+    <div style="font-size:0.7rem;color:var(--text-secondary);">Normal: &lt;1.15 &nbsp;|&nbsp; Elevado: 1.15-1.25 &nbsp;|&nbsp; Alto: &gt;1.25</div>
+  </div>`;
+
+  for (const s of segments) {
+    if (!latestRatios[s]) continue;
+    const r = latestRatios[s];
+    // Color by range
+    let color = 'var(--accent-3c)';
+    if (r >= 1.25) color = 'var(--danger)';
+    else if (r >= 1.15) color = 'var(--warning)';
+    // Bar: normalize 1.0 to 1.4 range
+    const pct = Math.min((r - 1.0) / 0.4 * 100, 100);
+    html += `<div style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-bottom:2px;">
+        <span style="color:var(--text-secondary)">${segLabels[s]}</span>
+        <span style="font-family:'JetBrains Mono',monospace;color:${color}">${r.toFixed(3)}</span>
+      </div>
+      <div style="height:8px;background:var(--bg);border-radius:4px;overflow:hidden;position:relative;">
+        <div style="position:absolute;left:37.5%;width:1px;height:100%;background:var(--border-hover);"></div>
+        <div style="height:100%;width:${pct}%;background:${color};opacity:0.6;border-radius:4px;"></div>
+      </div>
+    </div>`;
+  }
+  html += '<div style="font-size:0.65rem;color:var(--text-tertiary);margin-top:4px;">Linha vertical = 1.15 (limiar normal/elevado)</div>';
+  html += '</div>';
+
+  // Right: trend chart
+  html += '<div><div style="position:relative;width:100%;height:220px;"><canvas id="ecwChart"></canvas></div></div>';
+  html += '</div>';
+
+  // Interpretation
+  const trunkRatio = latestRatios.trunk;
+  const limbMean = [latestRatios.rArm, latestRatios.lArm, latestRatios.rLeg, latestRatios.lLeg].filter(Boolean);
+  const limbMeanVal = limbMean.length > 0 ? limbMean.reduce((a,b)=>a+b,0)/limbMean.length : 0;
+
+  if (trunkRatio && limbMeanVal) {
+    const diff = trunkRatio - limbMeanVal;
+    html += `<div style="margin-top:1rem;padding:0.75rem;background:var(--bg);border-radius:8px;font-size:0.8rem;color:var(--text-secondary);">
+      <strong>Interpretação:</strong> Razão tronco (${trunkRatio.toFixed(3)}) vs membros (${limbMeanVal.toFixed(3)}). `;
+    if (Math.abs(diff) < 0.02) {
+      html += 'Distribuição hídrica homogênea entre tronco e membros — padrão normal.';
+    } else if (trunkRatio > limbMeanVal) {
+      html += 'Tronco com razão maior que membros — pode indicar acúmulo de líquido extracelular na região abdominal (edema, inflamação ou retenção pós-refeição).';
+    } else {
+      html += 'Membros com razão maior — padrão menos comum, pode indicar retenção periférica.';
+    }
+    html += '</div>';
+  }
+
+  document.getElementById('ecw-icw-content').innerHTML = html;
+
+  // Render ECW trend chart
+  setTimeout(() => {
+    const isDark = matchMedia('(prefers-color-scheme:dark)').matches;
+    const gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)';
+    const tickColor = isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)';
+
+    const datasets = [];
+    const colors = { rArm:'#c44d20', lArm:'#d97a50', trunk:'#2a6cb8', rLeg:'#148060', lLeg:'#40b090' };
+
+    for (const s of segments) {
+      const pts = withImp.filter(b => b.impedance[s] && b.impedance[s][1]>0)
+        .map(b => ({ x: b.date, y: b.impedance[s][0] / b.impedance[s][1] }));
+      if (pts.length > 0) {
+        datasets.push({ label: segLabels[s], data: pts, borderColor: colors[s], backgroundColor: colors[s], pointRadius: 4, borderWidth: 1.5, tension: 0.3 });
+      }
+    }
+
+    const canvas = document.getElementById('ecwChart');
+    if (canvas) {
+      new Chart(canvas, {
+        type: 'line', data: { datasets },
+        options: { responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 }, color: tickColor } },
+            tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(3) } }
+          },
+          scales: {
+            x: { type:'time', time:{unit:'day',tooltipFormat:'dd MMM yyyy'}, grid:{display:false}, ticks:{color:tickColor,font:{size:10}} },
+            y: { min:1.05, max:1.25, ticks:{color:tickColor,callback:v=>v.toFixed(2)}, grid:{color:gridColor} }
+          }
+        }
+      });
+    }
+  }, 100);
+}
+
+// ============================================================
+// MODEL DETAILS (3C + 4C)
+// ============================================================
+function renderModelDetails() {
+  const entries = computeModelEntries();
+  if (entries.length === 0) {
+    document.getElementById('model-details').innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;">Sem dados pareados.</p>';
+    return;
+  }
+
+  let html = `
+    <div class="formula-box">
+      <strong>Modelo 3C (Lohman, 1986)</strong><br>
+      %GC = (2.118 / Db − 0.78 × TBW / BW − 1.354) × 100
+    </div>
+    <div class="formula-box purple">
+      <strong>Modelo 4C (Heymsfield, 1996)</strong><br>
+      %GC = (2.747 / Db − 0.714 × TBW / BW + 1.146 × Mo / BW − 2.0503) × 100<br>
+      <span style="font-size:0.7rem;color:var(--text-secondary);">Mo = massa mineral total = massa óssea BIA / 0.779</span>
+    </div>`;
+
+  html += '<div style="overflow-x:auto;"><table><thead><tr><th>Adipo</th><th>BIA</th><th>Db</th><th>TBW</th><th>Mo</th><th>Peso</th><th style="color:var(--accent-adipo)">2C</th><th style="color:var(--accent-bia)">BIA</th><th style="color:var(--accent-3c)">3C</th><th style="color:var(--accent-4c)">4C</th></tr></thead><tbody>';
+  for (const e of entries) {
+    const Mo = e.boneMass ? (e.boneMass / 0.779).toFixed(1) : '—';
+    html += `<tr><td>${fmtDate(e.adipoDate)}</td><td>${fmtDate(e.biaDate)}</td><td>${e.density.toFixed(3)}</td><td>${e.tbwKg.toFixed(1)}</td><td>${Mo}</td><td>${e.avgWeight.toFixed(1)}</td>
+      <td style="color:var(--accent-adipo)">${e.bfAdipo.toFixed(1)}%</td>
+      <td style="color:var(--accent-bia)">${e.bfBIA.toFixed(1)}%</td>
+      <td style="color:var(--accent-3c);font-weight:500">${e.bf3c.toFixed(1)}%</td>
+      <td style="color:var(--accent-4c);font-weight:500">${e.bf4c != null ? e.bf4c.toFixed(1)+'%' : '—'}</td></tr>`;
+  }
+  html += '</tbody></table></div>';
+  document.getElementById('model-details').innerHTML = html;
+}
+
+// ============================================================
+// DATA TABLES
+// ============================================================
+function renderTables() {
+  let html = '<div style="overflow-x:auto;"><table><thead><tr><th>Data</th><th>Peso</th><th>Σ dobras</th><th>Db</th><th>%GC</th><th>Gord.</th><th>MLG</th><th>Cintura</th><th>RCQ</th></tr></thead><tbody>';
+  for (const a of adipoData) {
+    const sf = a.skinfolds;
+    const sum = sf.tricep+sf.abdom+sf.subsc+sf.axil+sf.chest+sf.supra+sf.thigh;
+    const rcq = a.waist && a.hip ? (a.waist/a.hip).toFixed(2) : '—';
+    html += `<tr><td>${fmtDate(a.date)}</td><td>${a.weight}</td><td>${sum.toFixed(1)}</td><td>${a.density.toFixed(3)}</td><td style="color:var(--accent-adipo)">${a.bf.toFixed(1)}%</td><td>${a.fatMass.toFixed(1)}</td><td>${a.ffm.toFixed(1)}</td><td>${a.waist||'—'}</td><td>${rcq}</td></tr>`;
+  }
+  html += '</tbody></table></div>';
+  document.getElementById('tab-adipo').innerHTML = html;
+
+  html = '<div style="overflow-x:auto;"><table><thead><tr><th>Data</th><th>Peso</th><th>%GC</th><th>Água</th><th>M.esq.</th><th>M.musc.</th><th>Osso</th><th>Visceral</th></tr></thead><tbody>';
+  for (const b of biaData) {
+    html += `<tr><td>${fmtDate(b.date)}</td><td>${b.weight}</td><td style="color:var(--accent-bia)">${b.bf.toFixed(1)}%</td><td>${b.water||'—'}%</td><td>${b.skMuscle||'—'}%</td><td>${b.muscleMass||'—'}</td><td>${b.boneMass||'—'}</td><td>${b.visceral||'—'}</td></tr>`;
+  }
+  html += '</tbody></table></div>';
+  document.getElementById('tab-bia').innerHTML = html;
+
+  html = '<div style="overflow-x:auto;"><table class="impedance-table"><thead><tr><th>Data</th><th>Braço D</th><th>Braço E</th><th>Tronco</th><th>Perna D</th><th>Perna E</th></tr></thead><tbody>';
+  for (const b of biaData) {
+    if (!b.impedance) continue;
+    const i = b.impedance;
+    html += `<tr><td>${fmtDate(b.date)}</td><td>${i.rArm[0]}/${i.rArm[1]} Ω</td><td>${i.lArm[0]}/${i.lArm[1]} Ω</td><td>${i.trunk[0]}/${i.trunk[1]} Ω</td><td>${i.rLeg[0]}/${i.rLeg[1]} Ω</td><td>${i.lLeg[0]}/${i.lLeg[1]} Ω</td></tr>`;
+  }
+  html += '</tbody></table></div>';
+  document.getElementById('tab-impedance').innerHTML = biaData.some(b=>b.impedance) ? html : '<p style="color:var(--text-secondary);font-size:0.85rem;">Nenhuma medição com impedância.</p>';
+}
+
+// ============================================================
+// TABS
+// ============================================================
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    tab.closest('.section').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.closest('.section').querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ============================================================
+// MODALS + SAVE
+// ============================================================
+function openModal(type) { document.getElementById('modal-'+type).classList.add('open'); }
+function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('open')); }
+document.querySelectorAll('.modal-overlay').forEach(m => { m.addEventListener('click', e => { if(e.target===m) closeModals(); }); });
+
+function saveAdipo() {
+  const d = document.getElementById('a-date').value;
+  const w = parseFloat(document.getElementById('a-weight').value);
+  const age = parseInt(document.getElementById('a-age').value) || 34;
+  const sf = {
+    tricep: parseFloat(document.getElementById('a-tricep').value),
+    abdom: parseFloat(document.getElementById('a-abdom').value),
+    subsc: parseFloat(document.getElementById('a-subsc').value),
+    axil: parseFloat(document.getElementById('a-axil').value),
+    chest: parseFloat(document.getElementById('a-chest').value),
+    supra: parseFloat(document.getElementById('a-supra').value),
+    thigh: parseFloat(document.getElementById('a-thigh').value)
+  };
+  if (!d || isNaN(w) || Object.values(sf).some(isNaN)) { alert('Preencha todos os campos.'); return; }
+  const { density } = jacksonPollock7(sf, age);
+  const bf = siriBF(density);
+  const fatMass = w * bf / 100;
+  const ffm = w - fatMass;
+  const waist = parseFloat(document.getElementById('a-waist').value) || null;
+  const hip = parseFloat(document.getElementById('a-hip').value) || null;
+  adipoData.push({ date:d, weight:w, skinfolds:sf, waist, hip, age, density, bf, fatMass, ffm });
+  adipoData.sort((a,b) => a.date.localeCompare(b.date));
+  closeModals(); saveToStorage(); renderAll();
+}
+
+function saveBIA() {
+  const d = document.getElementById('b-date').value;
+  const w = parseFloat(document.getElementById('b-weight').value);
+  const bf = parseFloat(document.getElementById('b-bf').value);
+  const water = parseFloat(document.getElementById('b-water').value);
+  if (!d || isNaN(w) || isNaN(bf)) { alert('Preencha data, peso e %GC.'); return; }
+  const entry = { date:d, weight:w, bf, water:water||null,
+    skMuscle: parseFloat(document.getElementById('b-muscle').value)||null,
+    muscleMass: parseFloat(document.getElementById('b-musclemass').value)||null,
+    boneMass: parseFloat(document.getElementById('b-bone').value)||null,
+    visceral: parseFloat(document.getElementById('b-visceral').value)||null };
+  const ra20 = parseFloat(document.getElementById('b-ra20').value);
+  if (!isNaN(ra20)) {
+    entry.impedance = {
+      rArm:[ra20, parseFloat(document.getElementById('b-ra100').value)||0],
+      lArm:[parseFloat(document.getElementById('b-la20').value)||0, parseFloat(document.getElementById('b-la100').value)||0],
+      trunk:[parseFloat(document.getElementById('b-tr20').value)||0, parseFloat(document.getElementById('b-tr100').value)||0],
+      rLeg:[parseFloat(document.getElementById('b-rl20').value)||0, parseFloat(document.getElementById('b-rl100').value)||0],
+      lLeg:[parseFloat(document.getElementById('b-ll20').value)||0, parseFloat(document.getElementById('b-ll100').value)||0]
+    };
+  }
+  biaData.push(entry);
+  biaData.sort((a,b) => a.date.localeCompare(b.date));
+  closeModals(); saveToStorage(); renderAll();
+}
+
+// ============================================================
+// PERSISTENCE
+// ============================================================
+function saveToStorage() {
+  try { localStorage.setItem('bodycomp_adipo', JSON.stringify(adipoData)); } catch(e) {}
+  try { localStorage.setItem('bodycomp_bia', JSON.stringify(biaData)); } catch(e) {}
+}
+function loadFromStorage() {
+  try {
+    const a = localStorage.getItem('bodycomp_adipo');
+    const b = localStorage.getItem('bodycomp_bia');
+    if (a) adipoData = JSON.parse(a);
+    if (b) biaData = JSON.parse(b);
+  } catch(e) {}
+}
+
+function exportData() {
+  const data = { version:2, exported:new Date().toISOString(), height:HEIGHT_CM, adipo:adipoData, bia:biaData };
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'body_composition_'+new Date().toISOString().slice(0,10)+'.json'; a.click();
+}
+
+function importData(event) {
+  const file = event.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.adipo) adipoData = data.adipo;
+      if (data.bia) biaData = data.bia;
+      saveToStorage(); renderAll(); alert('Dados importados!');
+    } catch(err) { alert('Erro: ' + err.message); }
+  };
+  reader.readAsText(file); event.target.value = '';
+}
+
+function importCSV() { document.getElementById('csvInput').click(); }
+
+function handleCSV(event) {
+  const file = event.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      let raw = e.target.result.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+      const lines = raw.trim().split('\n');
+      if (lines.length < 2) { alert('Arquivo vazio.'); return; }
+      const sep = lines[0].includes('\t') ? '\t' : ',';
+      const header = lines[0].split(sep).map(h=>h.trim());
+      let added=0, skippedDup=0, skippedParse=0, updatedExisting=0;
+
+      const extractFirstNum = (str) => {
+        if (!str || str.trim()==='--' || str.trim()==='') return null;
+        const m = str.split('(')[0].match(/-?[\d.]+/);
+        return m ? parseFloat(m[0]) : null;
+      };
+
+      let cols;
+      const getVal = (colName) => { const idx=header.indexOf(colName); return (idx<0||idx>=cols.length)?null:extractFirstNum(cols[idx]); };
+      const getValFuzzy = (partial) => { const idx=header.findIndex(h=>h.toLowerCase().includes(partial.toLowerCase())); return (idx<0||idx>=cols.length)?null:extractFirstNum(cols[idx]); };
+
+      for (let i=1;i<lines.length;i++) {
+        cols = lines[i].split(sep);
+        if (cols.length<5) continue;
+        const dateStr=cols[0].trim();
+        const match=dateStr.match(/(\w{3})\.(\d{1,2})\s+(\d{4})/);
+        if (!match){skippedParse++;continue;}
+        const months={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+        const mo=months[match[1]]; if(!mo){skippedParse++;continue;}
+        const isoDate=`${match[3]}-${mo}-${match[2].padStart(2,'0')}`;
+        const weight=getVal('Weight'), bf=getVal('Body Fat');
+        if (!weight||!bf){skippedParse++;continue;}
+
+        // Parse segmental fat
+        const parseSegFat = (name) => {
+          const idx=header.findIndex(h=>h.toLowerCase().includes(name.toLowerCase())&&h.toLowerCase().includes('segmental fat'));
+          if (idx<0||idx>=cols.length||!cols[idx]) return null;
+          const m2=cols[idx].match(/([\d.]+)\s*kg/); return m2?parseFloat(m2[1]):extractFirstNum(cols[idx]);
+        };
+        let segFat = null;
+        const segLArm=parseSegFat('left_arm'), segRArm=parseSegFat('right_arm');
+        const segTrunk=parseSegFat('trunk'), segLLeg=parseSegFat('left_leg'), segRLeg=parseSegFat('right_leg');
+        if (segLArm!=null||segRArm!=null||segTrunk!=null) {
+          segFat={lArm:segLArm||0,rArm:segRArm||0,trunk:segTrunk||0,lLeg:segLLeg||0,rLeg:segRLeg||0};
+        }
+
+        // Parse impedance
+        const parseImp = (segName) => {
+          const idx=header.findIndex(h=>h.toLowerCase().includes(segName.toLowerCase())&&h.toLowerCase().includes('bioelectrical'));
+          if (idx<0||idx>=cols.length||!cols[idx]) return null;
+          const m2=cols[idx].match(/([\d.]+)\s*[\/,]\s*([\d.]+)/);
+          return m2?[parseFloat(m2[1]),parseFloat(m2[2])]:null;
+        };
+        const impRA=parseImp('right_arm'),impLA=parseImp('left_arm'),impTR=parseImp('trunk'),impRL=parseImp('right_leg'),impLL=parseImp('left_leg');
+        let impedance = null;
+        if (impRA&&impLA&&impTR&&impRL&&impLL) { impedance={rArm:impRA,lArm:impLA,trunk:impTR,rLeg:impRL,lLeg:impLL}; }
+
+        // Check for existing record on same date — merge instead of skip
+        const existing = biaData.find(b=>b.date===isoDate);
+        if (existing) {
+          let updated = false;
+          if (segFat && !existing.segFat) { existing.segFat = segFat; updated = true; }
+          if (impedance && !existing.impedance) { existing.impedance = impedance; updated = true; }
+          if (!existing.water && getVal('Body Water')) { existing.water = getVal('Body Water'); updated = true; }
+          if (!existing.boneMass && (getVal('Bone Mass')||getValFuzzy('bone mass'))) { existing.boneMass = getVal('Bone Mass')||getValFuzzy('bone mass'); updated = true; }
+          if (!existing.visceral && (getVal('Visceral Fat')||getValFuzzy('visceral fat'))) { existing.visceral = getVal('Visceral Fat')||getValFuzzy('visceral fat'); updated = true; }
+          if (updated) { updatedExisting++; } else { skippedDup++; }
+          continue;
+        }
+
+        const entry = { date:isoDate, weight, bf,
+          water:getVal('Body Water'), skMuscle:getVal('Skeletal Muscle')||getValFuzzy('skeletal muscle'),
+          muscleMass:getVal('Muscle mass')||getValFuzzy('muscle mass'),
+          boneMass:getVal('Bone Mass')||getValFuzzy('bone mass'),
+          visceral:getVal('Visceral Fat')||getValFuzzy('visceral fat') };
+        if (segFat) entry.segFat = segFat;
+        if (impedance) entry.impedance = impedance;
+
+        biaData.push(entry); added++;
+      }
+      biaData.sort((a,b)=>a.date.localeCompare(b.date));
+      saveToStorage(); renderAll();
+      let msg=`Importados: ${added}.`;
+      if(updatedExisting>0) msg+=` Atualizados: ${updatedExisting}.`;
+      if(skippedDup>0) msg+=` Sem alteração: ${skippedDup}.`;
+      if(skippedParse>0) msg+=` Ignorados: ${skippedParse}.`;
+      if(added===0&&updatedExisting===0&&skippedDup===0&&skippedParse===0) msg='Nenhum registro encontrado.';
+      alert(msg);
+    } catch(err) { alert('Erro: '+err.message); }
+  };
+  reader.readAsText(file,'UTF-8'); event.target.value='';
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function renderAll() {
+  renderSummary();
+  renderCharts();
+  renderRiskScore();
+  renderFatMap();
+  renderECWICW();
+  renderModelDetails();
+  renderTables();
+}
+
+loadFromStorage();
+renderAll();
+</script>
+</body>
+</html>
